@@ -15,16 +15,28 @@ from surprise import Reader, Dataset, SVD, evaluate
 import warnings; warnings.simplefilter('ignore')
 
 credits = pd.read_csv('credits.csv')
+credits_foreign = pd.read_csv('credits_foreign_movies.csv')
 keywords = pd.read_csv('keywords.csv')
+keywords_foreign = pd.read_csv('keywords_foreign_movies.csv')
 links_small = pd.read_csv('links_small.csv')
+links_foreign = pd.read_csv('links_foreign_movies.csv')
 md = pd.read_csv('movies_metadata.csv')
+md_foreign = pd.read_csv('foreignfilms.csv')
 ratings = pd.read_csv('ratings_small.csv')
+ratings_foreign = pd.read_csv('ratings_foreign_movies.csv')
+
 
 print(credits.head())
 
 credits.columns
 credits.shape
 print(credits.info())
+
+print(credits_foreign.head())
+
+credits_foreign.columns
+credits_foreign.shape
+print(credits_foreign.info())
 
 print(keywords.head())
 
@@ -33,12 +45,26 @@ keywords.shape
 
 print(keywords.info())
 
+print(keywords_foreign.head())
+
+keywords_foreign.columns
+keywords_foreign.shape
+
+print(keywords_foreign.info())
+
 print(links_small.head())
 
 links_small.columns
 links_small.shape
 
 print(links_small.info())
+
+print(links_foreign.head())
+
+links_foreign.columns
+links_foreign.shape
+
+print(links_foreign.info())
 
 print(md.iloc[0:3].transpose())
 
@@ -47,6 +73,13 @@ md.shape
 
 print(md.info())
 
+print(md_foreign.iloc[0:3].transpose())
+
+md_foreign.columns
+md_foreign.shape
+
+print(md_foreign.info())
+
 print(ratings.head())
 
 ratings.columns
@@ -54,19 +87,41 @@ ratings.shape
 
 print(ratings.info())
 
+print(ratings_foreign.head())
+
+ratings_foreign.columns
+ratings_foreign.shape
+
+print(ratings_foreign.info())
+
 md['genres'] = md['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i[
+    'name'] for i in x] if isinstance(x, list) else [])
+
+md_foreign['genres'] = md_foreign['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i[
     'name'] for i in x] if isinstance(x, list) else [])
 
 vote_counts = md[md['vote_count'].notnull()]['vote_count'].astype('int')
 vote_averages = md[md['vote_average'].notnull()]['vote_average'].astype('int')
 
+vote_counts_foreign = md_foreign[md_foreign['vote_count'].notnull()]['vote_count'].astype('int')
+vote_averages_foreign = md_foreign[md_foreign['vote_average'].notnull()]['vote_average'].astype('int')
+
 C = vote_averages.mean()
 print(C)
+
+C_foreign = vote_averages_foreign.mean()
+print(C_foreign)
 
 m = vote_counts.quantile(0.95)
 print(m)
 
+m_foreign = vote_counts_foreign.quantile(0.55)
+print(m_foreign)
+
 md['year'] = pd.to_datetime(md['release_date'], errors='coerce').apply(
+    lambda x: str(x).split('-')[0] if x != np.nan else np.nan)
+
+md_foreign['year'] = pd.to_datetime(md_foreign['release_date'], errors='coerce').apply(
     lambda x: str(x).split('-')[0] if x != np.nan else np.nan)
 
 qualified = md[(md['vote_count'] >= m) &
@@ -81,6 +136,18 @@ qualified = md[(md['vote_count'] >= m) &
 qualified['vote_count'] = qualified['vote_count'].astype('int')
 qualified['vote_average'] = qualified['vote_average'].astype('int')
 
+qualified_foreign = md_foreign[(md_foreign['vote_count'] >= m_foreign) &
+               (md_foreign['vote_count'].notnull()) &
+               (md_foreign['vote_average'].notnull())][['title',
+                                                'year',
+                                                'vote_count',
+                                                'vote_average',
+                                                'popularity',
+                                                'genres']]
+
+qualified_foreign['vote_count'] = qualified_foreign['vote_count'].astype('int')
+qualified_foreign['vote_average'] = qualified_foreign['vote_average'].astype('int')
+
 def weighted_rating(x):
     v = x['vote_count']
     R = x['vote_average']
@@ -88,30 +155,46 @@ def weighted_rating(x):
 qualified['wr'] = qualified.apply(weighted_rating, axis=1)
 qualified = qualified.sort_values('wr', ascending=False).head(250)
 
+qualified_foreign['wr'] = qualified_foreign.apply(weighted_rating, axis=1)
+qualified_foreign = qualified_foreign.sort_values('wr', ascending=False).head(250)
+
+print(qualified.head(15))
+print(qualified_foreign.head(15))
+
 s = md.apply(lambda x: pd.Series(x['genres']),axis=1).stack().reset_index(level=1, drop=True)
 s.name = 'genre'
 gen_md = md.drop('genres', axis=1).join(s)
+print(gen_md.head(3).transpose())
+
+s_foreign = md_foreign.apply(lambda x: pd.Series(x['genres']),axis=1).stack().reset_index(level=1, drop=True)
+s_foreign.name = 'genre'
+gen_md_foreign = md_foreign.drop('genres', axis=1).join(s)
+print(gen_md_foreign.head(3).transpose())
 
 def build_chart(genre, percentile=0.85):
-    df = gen_md[gen_md['genre'] == genre]
-    vote_counts = df[df['vote_count'].notnull()]['vote_count'].astype('int')
-    vote_averages = df[df['vote_average'].notnull()]['vote_average'].astype('int')
-    C = vote_averages.mean()
-    m = vote_counts.quantile(percentile)
+    df = gen_md_foreign[gen_md_foreign['genre'] == genre]
+    vote_counts_foreign = df[df['vote_count'].notnull()]['vote_count'].astype('int')
+    vote_averages_foreign = df[df['vote_average'].notnull()]['vote_average'].astype('int')
+    C_foreign = vote_averages_foreign.mean()
+    m_foreign = vote_counts_foreign.quantile(percentile)
 
-    qualified = df[(df['vote_count'] >= m) & (df['vote_count'].notnull()) &
-                   (df['vote_average'].notnull())][['title', 'year', 'vote_count', 'vote_average', 'popularity']]
-    qualified['vote_count'] = qualified['vote_count'].astype('int')
-    qualified['vote_average'] = qualified['vote_average'].astype('int')
+    qualified_foreign = df[(df['vote_count'] >= m_foreign) & (df['vote_count'].notnull()) &
+                   (df['vote_average'].notnull())][['title', 'year', 'vote_count', 'vote_average', 'popularity', 'genre']]
+    qualified_foreign['vote_count'] = qualified_foreign['vote_count'].astype('int')
+    qualified_foreign['vote_average'] = qualified_foreign['vote_average'].astype('int')
 
-    qualified['wr'] = qualified.apply(lambda x:
+    qualified_foreign['wr'] = qualified_foreign.apply(lambda x:
                         (x['vote_count']/(x['vote_count']+m) * x['vote_average']) + (m/(m+x['vote_count']) * C),
                         axis=1)
-    qualified = qualified.sort_values('wr', ascending=False).head(250)
+    qualified_foreign = qualified_foreign.sort_values('wr', ascending=False).head(250)
 
-    return qualified
+    return qualified_foreign
+
+print(build_chart('Romance').head(15))
 
 links_small = links_small[links_small['tmdbId'].notnull()]['tmdbId'].astype('int')
+
+links_foreign = links_foreign[links_foreign['tmdbId'].notnull()]['tmdbId'].astype('int')
 
 def convert_int(x):
     try:
@@ -122,27 +205,49 @@ def convert_int(x):
 md['id'] = md['id'].apply(convert_int)
 print(md[md['id'].isnull()])
 
+md_foreign['id'] = md_foreign['id'].apply(convert_int)
+print(md_foreign[md_foreign['id'].isnull()])
+
 md = md.drop([19730, 29503, 35587])
 md['id'] = md['id'].astype('int')
+md_foreign['id'] = md_foreign['id'].astype('int')
 
 smd = md[md['id'].isin(links_small)]
 print(smd.shape)
+
+smd_foreign = md_foreign[md_foreign['id'].isin(links_foreign)]
+print(smd_foreign.shape)
 
 smd['tagline'] = smd['tagline'].fillna('')
 smd['description'] = smd['overview'] + smd['tagline']
 smd['description'] = smd['description'].fillna('')
 
+smd_foreign['tagline'] = smd_foreign['tagline'].fillna('')
+smd_foreign['description'] = smd_foreign['overview'] + smd_foreign['tagline']
+smd_foreign['description'] = smd_foreign['description'].fillna('')
+
 tf = TfidfVectorizer(analyzer='word',ngram_range=(1, 2),min_df=0, stop_words='english')
 tfidf_matrix = tf.fit_transform(smd['description'])
 
+tf_foreign = TfidfVectorizer(analyzer='word',ngram_range=(1, 2),min_df=0, stop_words='english')
+tfidf_matrix_foreign = tf.fit_transform(smd_foreign['description'])
+
 print(tfidf_matrix.shape)
+print(tfidf_matrix_foreign.shape)
 
 cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
 print(cosine_sim[0])
 
+cosine_sim_foreign = linear_kernel(tfidf_matrix_foreign, tfidf_matrix_foreign)
+print(cosine_sim_foreign[0])
+
 smd = smd.reset_index()
 titles = smd['title']
 indices = pd.Series(smd.index, index=smd['title'])
+
+smd_foreign = smd_foreign.reset_index()
+titles_foreign = smd_foreign['title']
+indices_foreign = pd.Series(smd_foreign.index, index=smd_foreign['title'])
 
 def get_recommendations(title):
     idx = indices[title]
@@ -195,6 +300,9 @@ s = s.value_counts()
 print(s[:5])
 
 s = s[s > 1]
+
+stemmer = SnowballStemmer('english')
+stemmer.stem('dogs')
 
 def filter_keywords(x):
     words = []
