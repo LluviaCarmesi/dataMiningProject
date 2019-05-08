@@ -257,7 +257,7 @@ def get_recommendations(title):
     movie_indices = [i[0] for i in sim_scores]
     return titles_foreign.iloc[movie_indices]
 
-print(get_recommendations('Leaving Las Vegas').head(10))
+print(get_recommendations('Small Faces').head(10))
 
 keywords['id'] = keywords['id'].astype('int')
 credits['id'] = credits['id'].astype('int')
@@ -395,4 +395,4 @@ def improved_recommendations(title):
     qualified = qualified.sort_values('wr', ascending=False).head(10)
     return qualified
 
-print(improved_recommendations('Leaving Las Vegas'))
+print(improved_recommendations('Small Faces'))
