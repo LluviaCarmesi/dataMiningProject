@@ -375,14 +375,14 @@ smd_foreign = smd_foreign.reset_index()
 titles_foreign = smd_foreign['title']
 indices_foreign = pd.Series(smd.index, index=smd['title'])
 
-def improved_recommendations(title):
-    idx = indices[title]
+def improved_recommendations(movie_input):
+    idx = indices[movie_input]
     sim_scores = list(enumerate(cosine_sim_foreign[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = sim_scores[1:26]
     movie_indices = [i[0] for i in sim_scores]
 
-    movies = smd_foreign.iloc[movie_indices][['title', 'vote_count', 'vote_average', 'year']]
+    movies = smd_foreign.iloc[movie_indices][['title', 'vote_count', 'vote_average', 'year', 'original_title', 'genres']]
     vote_counts = movies[movies['vote_count'].notnull()]['vote_count'].astype('int')
     vote_averages = movies[movies['vote_average'].notnull()]['vote_average'].astype('int')
     C = vote_averages.mean()
@@ -395,4 +395,6 @@ def improved_recommendations(title):
     qualified = qualified.sort_values('wr', ascending=False).head(10)
     return qualified
 
-print(improved_recommendations('Small Faces'))
+movie_input = input("Enter a movie: ")
+
+print(improved_recommendations(movie_input))
