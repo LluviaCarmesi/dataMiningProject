@@ -251,33 +251,47 @@ indices_foreign = pd.Series(smd_foreign.index, index=smd_foreign['title'])
 
 def get_recommendations(title):
     idx = indices[title]
-    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = list(enumerate(cosine_sim_foreign[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:31]
+    sim_scores = sim_scores[1:3]
     movie_indices = [i[0] for i in sim_scores]
-    return titles.iloc[movie_indices]
+    return titles_foreign.iloc[movie_indices]
 
-print(get_recommendations('The Godfather').head(10))
-
-print(get_recommendations('The Dark Knight').head(10))
+print(get_recommendations('Leaving Las Vegas').head(10))
 
 keywords['id'] = keywords['id'].astype('int')
 credits['id'] = credits['id'].astype('int')
 md['id'] = md['id'].astype('int')
-
 print(md.shape)
+
+keywords_foreign['id'] = keywords_foreign['id'].astype('int')
+credits_foreign['id'] = credits_foreign['id'].astype('int')
+md_foreign['id'] = md_foreign['id'].astype('int')
+print(md_foreign.shape)
 
 md = md.merge(credits, on='id')
 md = md.merge(keywords, on='id')
 
+md_foreign = md_foreign.merge(credits, on='id')
+md_foreign = md_foreign.merge(keywords, on='id')
+
 smd = md[md['id'].isin(links_small)]
 print(smd.shape)
+
+smd_foreign = md_foreign[md_foreign['id'].isin(links_foreign)]
+print(smd_foreign.shape)
 
 smd['cast'] = smd['cast'].apply(literal_eval)
 smd['crew'] = smd['crew'].apply(literal_eval)
 smd['keywords'] = smd['keywords'].apply(literal_eval)
 smd['cast_size'] = smd['cast'].apply(lambda x: len(x))
 smd['crew_size'] = smd['crew'].apply(lambda x: len(x))
+
+smd_foreign['cast'] = smd_foreign['cast'].apply(literal_eval)
+smd_foreign['crew'] = smd_foreign['crew'].apply(literal_eval)
+smd_foreign['keywords'] = smd_foreign['keywords'].apply(literal_eval)
+smd_foreign['cast_size'] = smd_foreign['cast'].apply(lambda x: len(x))
+smd_foreign['crew_size'] = smd_foreign['crew'].apply(lambda x: len(x))
 
 def get_director(x):
     for i in x:
@@ -294,15 +308,30 @@ smd['cast'] = smd['cast'].apply(lambda x: [str.lower(i.replace(" ", "")) for i i
 smd['director'] = smd['director'].astype('str').apply(lambda x: str.lower(x.replace(" ", "")))
 smd['director'] = smd['director'].apply(lambda x: [x,x, x])
 
+smd_foreign['director'] = smd_foreign['crew'].apply(get_director)
+smd_foreign['cast'] = smd_foreign['cast'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
+smd_foreign['cast'] = smd_foreign['cast'].apply(lambda x: x[:3] if len(x) >=3 else x)
+smd_foreign['keywords'] = smd_foreign['keywords'].apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else [])
+
+smd_foreign['cast'] = smd_foreign['cast'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
+smd_foreign['director'] = smd_foreign['director'].astype('str').apply(lambda x: str.lower(x.replace(" ", "")))
+smd_foreign['director'] = smd_foreign['director'].apply(lambda x: [x,x, x])
+
 s = smd.apply(lambda x: pd.Series(x['keywords']),axis=1).stack().reset_index(level=1, drop=True)
 s.name = 'keyword'
 s = s.value_counts()
 print(s[:5])
 
+s_foreign = smd_foreign.apply(lambda x: pd.Series(x['keywords']),axis=1).stack().reset_index(level=1, drop=True)
+s_foreign.name = 'keyword'
+s_foreign = s_foreign.value_counts()
+print(s_foreign[:5])
+
 s = s[s > 1]
 
+s_foreign = s_foreign[s_foreign > 1]
+
 stemmer = SnowballStemmer('english')
-stemmer.stem('dogs')
 
 def filter_keywords(x):
     words = []
@@ -317,29 +346,43 @@ smd['keywords'] = smd['keywords'].apply(lambda x: [stemmer.stem(i) for i in x])
 smd['keywords'] = smd['keywords'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
 
 
+smd_foreign['soup'] = smd_foreign['keywords'] + smd_foreign['cast'] + smd_foreign['director'] + smd_foreign['genres']
+smd_foreign['soup'] = smd_foreign['soup'].apply(lambda x: ' '.join(x))
+
+smd_foreign['keywords'] = smd_foreign['keywords'].apply(filter_keywords)
+smd_foreign['keywords'] = smd_foreign['keywords'].apply(lambda x: [stemmer.stem(i) for i in x])
+smd_foreign['keywords'] = smd_foreign['keywords'].apply(lambda x: [str.lower(i.replace(" ", "")) for i in x])
+
+
 smd['soup'] = smd['keywords'] + smd['cast'] + smd['director'] + smd['genres']
 smd['soup'] = smd['soup'].apply(lambda x: ' '.join(x))
-
 
 count = CountVectorizer(analyzer='word',ngram_range=(1, 2),min_df=0, stop_words='english')
 count_matrix = count.fit_transform(smd['soup'])
 
 cosine_sim = cosine_similarity(count_matrix, count_matrix)
 
+count_foreign = CountVectorizer(analyzer='word',ngram_range=(1, 2),min_df=0, stop_words='english')
+count_matrix_foreign = count.fit_transform(smd_foreign['soup'])
+
+cosine_sim_foreign = cosine_similarity(count_matrix_foreign, count_matrix_foreign)
+
 smd = smd.reset_index()
 titles = smd['title']
 indices = pd.Series(smd.index, index=smd['title'])
 
-get_recommendations('The Dark Knight').head(10)
+smd_foreign = smd_foreign.reset_index()
+titles_foreign = smd_foreign['title']
+indices_foreign = pd.Series(smd.index, index=smd['title'])
 
 def improved_recommendations(title):
     idx = indices[title]
-    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = list(enumerate(cosine_sim_foreign[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = sim_scores[1:26]
     movie_indices = [i[0] for i in sim_scores]
 
-    movies = smd.iloc[movie_indices][['title', 'vote_count', 'vote_average', 'year']]
+    movies = smd_foreign.iloc[movie_indices][['title', 'vote_count', 'vote_average', 'year']]
     vote_counts = movies[movies['vote_count'].notnull()]['vote_count'].astype('int')
     vote_averages = movies[movies['vote_average'].notnull()]['vote_average'].astype('int')
     C = vote_averages.mean()
@@ -351,3 +394,5 @@ def improved_recommendations(title):
     qualified['wr'] = qualified.apply(weighted_rating, axis=1)
     qualified = qualified.sort_values('wr', ascending=False).head(10)
     return qualified
+
+print(improved_recommendations('Leaving Las Vegas'))
